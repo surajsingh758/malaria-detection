@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MalariaScope AI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif}
+
+body{
+    background:radial-gradient(circle at top,#0f172a,#020617 70%);
+    color:white;
+}
+
+/* NAVBAR */
+.nav{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:20px 40px;
+}
+.logo{font-size:20px;font-weight:bold;}
+.logo span{color:#7c3aed}
+.status{
+    background:#064e3b;
+    padding:6px 14px;
+    border-radius:20px;
+    font-size:13px;
+}
+
+/* HERO */
+.hero{text-align:center;padding:60px 20px 30px;}
+.hero h1{font-size:42px;font-weight:800;}
+.hero h1 span{color:#8b5cf6;}
+.subtitle{margin-top:10px;opacity:.7;}
+
+/* UPLOAD */
+.upload-section{
+    margin:60px auto;
+    max-width:700px;
+    padding:40px;
+    border-radius:25px;
+    background:rgba(255,255,255,0.04);
+    border:2px dashed #334155;
+    text-align:center;
+}
+
+.upload-section form{
+    display:flex;
+    flex-direction:column;
+    align-items:center;   /* 👈 this fixes side issue */
+}
+
+.preview-img{
+    margin-top:20px;
+    max-width:220px;
+    border-radius:15px;
+    display:none;
+}
+
+.file-info{
+    margin-top:10px;
+    font-size:14px;
+    opacity:.7;
+}
+
+.upload-btn{
+    margin-top:25px;
+    padding:12px 30px;
+    border:none;
+    border-radius:10px;
+    background:linear-gradient(135deg,#6366f1,#8b5cf6);
+    color:white;
+    font-size:16px;
+    cursor:pointer;
+    transition:.3s;
+}
+.upload-btn:hover{transform:scale(1.05)}
+
+/* RESULT */
+.result-wrapper{
+    display:none;
+    max-width:800px;
+    margin:40px auto;
+    padding:30px;
+    border-radius:20px;
+    background:rgba(255,255,255,0.05);
+}
+
+.success{border:2px solid #22c55e;}
+.danger{border:2px solid #ef4444;}
+
+.confidence-bar{
+    margin-top:15px;
+    height:14px;
+    background:#1e293b;
+    border-radius:10px;
+    overflow:hidden;
+}
+
+.bar{
+    height:14px;
+    width:0%;
+    border-radius:10px;
+    transition:width 1s ease;
+}
+</style>
+</head>
+
+<body>
+
+<div class="nav">
+    <div class="logo">Malaria<span>Scope</span></div>
+    <div class="status">🟢 System Online</div>
+</div>
+
+<div class="hero">
+    <h1>AI-Powered <span>Malaria Detection</span></h1>
+    <div class="subtitle">Upload microscopic blood cell image for instant diagnosis</div>
+</div>
+
+<div class="upload-section">
+    <form id="uploadForm">
+        <input type="file" name="file" id="fileInput" accept="image/*" required>
+
+        <img id="preview" class="preview-img">
+
+        <div id="fileInfo" class="file-info"></div>
+
+        <button type="submit" class="upload-btn">Analyze Sample</button>
+    </form>
+</div>
+
+<!-- RESULT SECTION -->
+<div class="result-wrapper" id="resultWrapper">
+
+    <div style="display:flex; gap:30px; flex-wrap:wrap; align-items:flex-start;">
+
+        <!-- LEFT SIDE RESULT -->
+        <div id="resultCard" style="flex:2; padding:25px; border-radius:20px;">
+            
+            <h2 id="predictionText"></h2>
+            <p id="subText" style="opacity:.7;"></p>
+
+            <div class="confidence-bar">
+                <div class="bar" id="confidenceBar"></div>
+            </div>
+
+            <p style="margin-top:10px;">
+                Confidence: <strong><span id="confidenceText"></span>%</strong>
+            </p>
+
+        </div>
+
+        <!-- RIGHT SIDE ANALYSIS -->
+        <div style="flex:1; background:rgba(255,255,255,0.05); padding:20px; border-radius:15px;">
+            <h3>Analysis Details</h3>
+            <p><strong>Model:</strong> CustomCNN v1.0</p>
+            <p><strong>Processing Time:</strong> <span id="processingTime">~3-4 sec</span></p>
+            <p><strong>Timestamp:</strong> <span id="timestampText"></span></p>
+        </div>
+
+    </div>
+
+    <!-- MEDICAL DISCLAIMER -->
+    <div style="margin-top:25px; font-size:13px; opacity:.7;">
+        ⚠ This AI system is a screening tool. Results must be verified by qualified healthcare professionals.
+    </div>
+
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+
+    const fileInput = document.getElementById("fileInput");
+    const preview = document.getElementById("preview");
+    const fileInfo = document.getElementById("fileInfo");
+
+    fileInput.addEventListener("change", function(event) {
+        const file = event.target.files[0];
+
+        if(file){
+            preview.src = URL.createObjectURL(file);
+            preview.style.display = "block";
+            fileInfo.innerText = file.name + " • " + (file.size/1024).toFixed(2) + " KB";
+        }
+    });
+
+    document.getElementById("uploadForm").addEventListener("submit", async function(e){
+        e.preventDefault();
+
+        const startTime = Date.now();
+
+        const formData = new FormData(this);
+
+        const response = await fetch("/predict", {
+            method:"POST",
+            body:formData
+        });
+
+        const data = await response.json();
+        const endTime = Date.now();
+
+        const wrapper = document.getElementById("resultWrapper");
+        const card = document.getElementById("resultCard");
+        const text = document.getElementById("predictionText");
+        const subText = document.getElementById("subText");
+        const conf = document.getElementById("confidenceText");
+        const bar = document.getElementById("confidenceBar");
+        const time = document.getElementById("timestampText");
+
+        wrapper.style.display="block";
+
+        text.innerText = data.prediction;
+        conf.innerText = data.confidence;
+        time.innerText = data.timestamp;
+
+        const processing = ((endTime - startTime)/1000).toFixed(2);
+        document.getElementById("processingTime").innerText = processing + " sec";
+
+        bar.style.width = data.confidence + "%";
+
+        if(data.prediction==="Uninfected"){
+            card.style.border="2px solid #22c55e";
+            card.style.background="rgba(34,197,94,0.08)";
+            bar.style.background="#22c55e";
+            subText.innerText="No malaria parasites detected";
+        }else{
+            card.style.border="2px solid #ef4444";
+            card.style.background="rgba(239,68,68,0.08)";
+            bar.style.background="#ef4444";
+            subText.innerText="Malaria parasites detected";
+        }
+    });
+
+});
+</script>
+
+</body>
+</html>
